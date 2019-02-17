@@ -1,0 +1,189 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'signing'
+}
+
+group 'com.pakybytes'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+
+configurations {
+    deployerJars
+}
+
+/** Repos
+ */
+repositories {
+    mavenCentral()
+    jcenter()
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    maven { url 'https://oss.sonatype.org/content/repositories/releases' }
+}
+
+dependencies {
+    // Logging
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    implementation group: 'ch.qos.logback', name: 'logback-core', version: '1.2.3'
+    implementation group: 'ch.qos.logback', name: 'logback-access', version: '1.2.3'
+
+    // Encryption
+    implementation group: "org.abstractj.kalium", name: "kalium", version: "0.8.0"
+
+    // Tests
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.3.2'
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.3.2'
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.3.2'
+
+    testCompile group: 'org.mockito', name: 'mockito-core', version: '2.23.4'
+    testCompile group: 'org.mockito', name: 'mockito-junit-jupiter', version: '2.23.4'
+    testCompile group: 'com.nhaarman', name: 'mockito-kotlin', version: '1.6.0'
+}
+
+//
+//task sourceJar(type: Jar) {
+//    getArchiveClassifier()
+//    from sourceSets.main.allJava
+//}
+
+//task javadocJar(type: Jar, dependsOn: javadoc) {
+//    getArchiveClassifier()
+//    from javadoc.destinationDir
+//}
+//
+//artifacts {
+////    archives jar
+//    archives sourceJar
+////    archives javadocJar
+//}
+
+
+/** Signing
+ */
+signing {
+    sign configurations.archives
+}
+
+
+/** Publishing
+ */
+publishing {
+
+    publications {
+        mavenJava(MavenPublication) {
+            customizePom(pom)
+            groupId project.group
+            artifactId project.name
+            version project.version
+
+            from components.java
+
+
+            // create the sign pom artifact
+            pom.withXml {
+                def pomFile = file("${project.buildDir}/generated-pom.xml")
+                writeTo(pomFile)
+                def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+                artifact(pomAscFile) {
+                    classifier = null
+                    extension = 'pom.asc'
+                }
+            }
+
+//
+//            artifact(sourceJar) {
+//                classifier = 'sources'
+//            }
+//            artifact(javadocJar) {
+//                classifier = 'javadoc'
+//            }
+
+
+            // create the signed artifacts
+            project.tasks.signArchives.signatureFiles.each {
+                artifact(it) {
+                    def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+                    if (matcher.find()) {
+                        classifier = matcher.group(1)
+                    } else {
+                        classifier = null
+                    }
+                    extension = 'jar.asc'
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            credentials {
+                username sonatypeUsername
+                password sonatypePassword
+            }
+        }
+    }
+}
+
+def customizePom(pom) {
+    pom.withXml {
+        def root = asNode()
+
+        // eliminate test-scoped dependencies (no need in maven central POMs)
+        root.dependencies.removeAll { dep ->
+            dep.scope == "test"
+        }
+
+        // add all items necessary for maven central publication
+        root.children().last() + {
+            resolveStrategy = Closure.DELEGATE_FIRST
+
+            description 'Security utils for encryption and decryption'
+            name 'Schema.org Java'
+            url 'https://github.com/mautini/schemaorg-java'
+            organization {
+                name project.group
+                url 'https://github.com/mautini'
+            }
+            issueManagement {
+                system 'GitHub'
+                url 'https://github.com/mautini/schemaorg-java/issues'
+            }
+            licenses {
+                license {
+                    name 'MIT'
+                    url 'https://opensource.org/licenses/MIT'
+                    distribution 'repo'
+                }
+            }
+            scm {
+                url 'https://github.com/mautini/schemaorg-java'
+                connection 'scm:git:git://github.com/mautini/schemaorg-java.git'
+                developerConnection 'scm:git:ssh://git@github.com:mautini/schemaorg-java.git'
+            }
+            developers {
+                developer {
+                    id "HugoTigre"
+                    name "Hugo Tigre"
+                    email "hugotigre@gmail.com"
+                    organization 'pakybytes'
+                }
+            }
+        }
+    }
+}
+
+// generate the pom of the project (without publishing it) in case we need it
+model {
+    tasks.generatePomFileForMavenJavaPublication {
+        destination = file("$buildDir/generated-pom.xml")
+    }
+    tasks.publishMavenJavaPublicationToMavenLocal {
+        dependsOn project.tasks.signArchives
+    }
+    tasks.publishMavenJavaPublicationToMavenRepository {
+        dependsOn project.tasks.signArchives
+    }
+}

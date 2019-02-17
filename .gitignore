@@ -1,0 +1,15 @@
+**/logs
+**/target
+**/.idea
+**/.idea_modules
+**/.classpath
+**/.project
+**/.settings
+**/RUNNING_PID
+**/application.prod.conf
+**/logback.prod.xml
+/*.jar
+**/.gradle
+
+/build/
+ 
