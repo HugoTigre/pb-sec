@@ -10,3 +10,9 @@ directly in the operating system for this to work. For more on this please read 
 # Usage
 
 Just instantiate ```EncryptionUtils```, manually or through DI, and look at the available methods and documentation.
+
+# History
+
+This library was initially created to add this functionality to the Play Framework,
+which, i think after version 2.5, decided that this kind of functionality shouldn't 
+be provided by the framework.
