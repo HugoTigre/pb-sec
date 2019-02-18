@@ -1,4 +1,4 @@
-package com.pakybytes.sys.services.encryption;
+package com.pakybytes.sec.services.encryption;
 
 import org.abstractj.kalium.crypto.Random;
 

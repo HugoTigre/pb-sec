@@ -1,4 +1,4 @@
-package com.pakybytes.sys.services.encryption;
+package com.pakybytes.sec.services.encryption;
 
 import org.abstractj.kalium.crypto.SecretBox;
 import org.abstractj.kalium.encoders.Encoder;
@@ -8,7 +8,7 @@ import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.Map;
 
-import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_KEYBYTES;
+import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_NONCEBYTES;
 
 
 /**
@@ -35,14 +35,14 @@ public class EncryptionUtils {
     /**
      * Use this if random nonce per request is overkill
      */
-    private final byte[] repetableNonce;
+    private final byte[] repeatableNonce;
 
     private Encoder encoder = Encoder.HEX;
 
 
     public EncryptionUtils() {
         random = new SecureRandom();
-        repetableNonce = "965478932154856987652145".getBytes(StandardCharsets.UTF_8);
+        repeatableNonce = "965478932154856987652145".getBytes(StandardCharsets.UTF_8);
     }
 
 
@@ -52,13 +52,23 @@ public class EncryptionUtils {
 
 
     /**
+     * This nonce will be necessary to decrypt data with external tools,
+     * if you aren't passing the nonce to the encryption process.
+     *
+     * @return The repeatable Nonce
+     */
+    public byte[] getRepeatableNonce() {
+        return repeatableNonce;
+    }
+
+
+    /**
      * Creates and returns a new Secret Key
      *
      * @return the new key
      */
     public byte[] newSecretKey() {
-        // Key must be 32 bytes for secretbox
-        byte[] buf = new byte[CRYPTO_SECRETBOX_XSALSA20POLY1305_KEYBYTES];
+        byte[] buf = new byte[CRYPTO_SECRETBOX_XSALSA20POLY1305_NONCEBYTES]; // Key must be 32 bytes for secretbox
         random.nextBytes(buf);
         return buf;
     }
@@ -89,7 +99,7 @@ public class EncryptionUtils {
 
     /**
      * Encrypts a String.
-     * Always uses this class fixed {@link EncryptionUtils#repetableNonce}
+     * Always uses this class fixed {@link EncryptionUtils#repeatableNonce}
      *
      * @param secretKey The secret Key
      * @param data      The object to be encrypted
@@ -99,7 +109,7 @@ public class EncryptionUtils {
                           String data) {
 
         byte[] rawData = data.getBytes(StandardCharsets.UTF_8);
-        byte[] cipherText = box(secretKey).encrypt(repetableNonce, rawData);
+        byte[] cipherText = box(secretKey).encrypt(repeatableNonce, rawData);
 
         return encoder.encode(cipherText);
     }
@@ -115,14 +125,13 @@ public class EncryptionUtils {
     public String decryptWithNonce(byte[] secretKey,
                                    Map<String, String> data) {
 
-        Map.Entry<String, String> entry =
-                data.entrySet().iterator().next();
+        Map.Entry<String, String> entry = data.entrySet().iterator().next();
 
         Nonce nonce = new Nonce.Builder()
                 .fromBytes(encoder.decode(entry.getKey()))
                 .build();
 
-        String cipherTextHex = data.get(entry.getValue());
+        String cipherTextHex = entry.getValue();
         byte[] cipherText = encoder.decode(cipherTextHex);
         byte[] rawData = box(secretKey).decrypt(nonce.getRaw(), cipherText);
 
@@ -132,7 +141,7 @@ public class EncryptionUtils {
 
     /**
      * Decrypts a String.
-     * Always uses this class fixed {@link EncryptionUtils#repetableNonce}, as when encrypting with {@link EncryptionUtils#encrypt}.
+     * Always uses this class fixed {@link EncryptionUtils#repeatableNonce}, as when encrypting with {@link EncryptionUtils#encrypt}.
      *
      * @param secretKey The secret Key
      * @param data      The String to decrypt
@@ -141,7 +150,7 @@ public class EncryptionUtils {
     public String decrypt(byte[] secretKey, String data) {
 
         byte[] cipherText = encoder.decode(data);
-        byte[] rawData = box(secretKey).decrypt(repetableNonce, cipherText);
+        byte[] rawData = box(secretKey).decrypt(repeatableNonce, cipherText);
         return new String(rawData, StandardCharsets.UTF_8);
     }
 }
